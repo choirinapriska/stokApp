@@ -1,0 +1,437 @@
+
+<div class="col-md-12">
+    <h4 class="title">Purchase Order</h4>
+       
+    <div class="card">
+        <div class="card-header">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="card-title">Data Purchase Order</h4>    
+                </div>
+                
+                <div class="col-md-4">
+                    <button class="btn btn-fill" data-toggle="modal" data-target="#addForm" id="add">Create</button>
+                </div>     
+            </div>
+            
+        </div>
+        <div class="card-content">
+
+            <div class="fresh-datatables">
+                <table id="datatables" class="table table-striped table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
+                </table>
+            </div>
+
+
+        </div>
+    </div><!--  end card  -->
+</div>
+<!-- Button trigger modal -->
+<div id="modals"></div>
+<div id="modalItems"></div>
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        
+        var nmTbl = '#datatables';
+        var place = 'purchase_order';
+        var count = 0;
+
+        $.getJSON(api_url+place+"/get", function(result){
+            if(result[1].header !== undefined){
+                var head = demo.genHeader(result[1].header);
+                var data = result[2].data;
+
+                count = data.length;
+                demo.createDatatable(nmTbl,result[2].data, head); // init datatable
+            }
+        }); 
+
+        loadDataItem(place);
+
+        $.getJSON(api_url+"supplier/get", function(result){      
+            var kategoriEl = '';
+            var dataKat = result[2].data;
+
+            kategoriEl += '<option value="">Pilih Supplier</option>';
+
+            $.each(dataKat, function(index, val) {
+                 kategoriEl += '<option value="'+val[0]+'">'+val[1]+'</option>';
+            });
+ 
+            var form = '<div class="card-content">'+
+                            '<div class="form-group">'+
+                                '<label>ID</label>'+
+                                '<input type="text" placeholder="ex:PR00x" id="ID" class="form-control" disabled>'+
+                                '<label>Supplier</label>'+
+                                '<select id="ID_Supplier" class="form-control">'+
+                                kategoriEl+
+                                '</select>'+
+                                '<label>Term</label><br>'+
+                                '<input type="text" placeholder="Ex:9,10" id="Term" class="form-control">'+
+                                '<label>Items</label><br>'+
+                                '<button type="button" class="btn btn-fill" id="addItems">Add Items</button>'+
+                            '</div>'+
+                        '</div>';
+
+             var dataDetail = [];
+
+             $("#add").click(function(event) {
+                demo.createModal({nameEl : '#modals' , content : form,form:place,title:'Add Data '+place});
+
+                $('#ID').val(demo.genID('PO0000000000', count)); // generate ID
+
+                $('#addItems').click(function(event) {
+
+                    $('#itemModal').modal('show');
+
+                    $(".Qty").keyup(function(event) {
+                        var id = $(this);
+                        var qty = id.val() * id.attr('data-price');
+                        
+                        $('#countQty_'+id.attr('data-id')).html(qty);
+                    });
+
+                    $(".Disc").keyup(function(event) {
+                        var id = $(this);
+                        if(id.val() === ''){
+                            var qty = $('#Qty_'+id.attr('data-id')).val() * id.attr('data-price');
+                            
+                            $('#countQty_'+ id.attr('data-id')).html(qty);
+                        }else{
+                            var count = $('#countQty_'+ id.attr('data-id')).html();
+                            var disc  = $('#Disc_'+ id.attr('data-id')).val();
+                            var qty   = (count * disc)/100;  
+                            qty = count - qty;
+                            
+                            $('#countQty_'+ id.attr('data-id')).html(qty);
+                        }
+                        
+                    });
+
+                    dataDetail = saveItem();
+                });
+
+
+                $( "#"+place ).submit(function( event ) {
+                    var forminput = $("form#"+place+" input, form#"+place+" select");   
+                    var paramDet = dataDetail;
+
+                    var param = {};
+                    $.each(forminput, function(index, val) {
+                        var id = $(val).attr('id');
+                        var value = $(val).val();
+                        param[id] =value;
+                    });
+                    
+                     
+                    $.ajax({
+                        url: api_url+place+'/add',
+                        type: 'POST',
+                        dataType: 'json',
+                        data: param,
+                    })
+                    .done(function(result) {
+                        if(result[0].result === "success"){
+                        
+                            $.each(paramDet, function(index, val) {
+                                demo.putAjax(api_url+'purchase_order_detail/add',val,""); // insert detail
+                            });
+                        }
+                    })
+                    .fail(function(err) {
+                        console.log(err);
+                    });
+
+                    return false;
+                    event.preventDefault();
+                });
+            });
+
+            $(nmTbl).on('click', '#edit', function () {
+                var id =$(this).attr('data-key');
+
+                demo.ajaxGet(api_url+place+'/get/'+id).success(function(respon){
+
+                    var dataID = respon[2].data;
+                    
+                    demo.createModal({nameEl : '#modals',id : 'editForm',title : 'Edit Data '+place+' ID: '+id,content : form,form : place});
+                    
+                    $('#ID').val(id);
+                    $('#ID_Supplier').val(dataID[0][2]);
+                    $('#Term').val(dataID[0][3]); 
+
+                    $("#editForm").modal('show');
+
+                    loadDataItem(place);
+                    var checkData = [];
+                    var paramDetail = [];
+                    var countDetail = 0;
+
+                    $('#addItems').click(function(event) {
+                        $('#itemModal').modal('show');
+
+                        $(".Qty").keyup(function(event) {
+                            var id = $(this);
+                            var qty = id.val() * id.attr('data-price');
+                            
+                            $('#countQty_'+id.attr('data-id')).html(qty);
+                        });
+
+                        $(".Disc").keyup(function(event) {
+                            var id = $(this);
+                            if(id.val() === ''){
+                                var qty = $('#Qty_'+id.attr('data-id')).val() * id.attr('data-price');
+                                
+                                $('#countQty_'+ id.attr('data-id')).html(qty);
+                            }else{
+                                var count = $('#countQty_'+ id.attr('data-id')).html();
+                                var disc  = $('#Disc_'+ id.attr('data-id')).val();
+                                var qty   = (count * disc)/100; console.log(count +"|"+disc);
+                                qty = count - qty;
+                                
+                                $('#countQty_'+ id.attr('data-id')).html(qty);
+                            }
+                            
+                        });
+
+                        paramDetail = saveItem();
+
+                        $.getJSON(api_url+"purchase_order_detail/getPO/"+id, function(result){   
+
+                            if(result[1].data !== undefined){
+                                var data = result[1].data;
+                               
+                                countDetail =data.length;
+
+                                console.log(countDetail);
+
+                                $.each(data, function(index, val) {
+                                     $("#Qty_"+val.ID_Barang).val(val.Qty); 
+                                     $("#UOM_"+val.ID_Barang).val(val.UOM);
+                                     $("#Disc_"+val.ID_Barang).val(val.Disc);
+                                     $("#countQty_"+val.ID_Barang).html(val.Total);
+
+                                     checkData.push( val.ID_Barang);
+                                });
+                            }else{
+                                countDetail = 0;
+                            }
+                        });
+                    });
+
+                    $( "#"+place ).submit(function( event ) {
+                        var forminput = $("form#"+place+" input, form#"+place+" select");   
+                        var paramDet = paramDetail;
+
+                        var param = {};
+                        $.each(forminput, function(index, val) {
+                            var id = $(val).attr('id');
+                            var value = $(val).val();
+                            param[id] =value;
+                        });
+
+                        $.ajax({
+                            url: api_url+place+'/update/'+id,
+                            type: 'POST',
+                            dataType: 'json',
+                            data: param,
+                        })
+                        .done(function(result) {
+                            if(result[0].result === "success"){
+                                $.each(paramDet, function(index, val) {
+
+                                    if($.inArray(val.ID_Barang,checkData) === -1){
+                                        console.log(val);
+                                        demo.putAjax(api_url+'purchase_order_detail/add/',val,""); // insert detail
+                                    }  else{
+                                        demo.putAjax(api_url+'purchase_order_detail/update/'+id,val,""); // update detail
+                                    }                          
+                                    
+                                });
+                            }
+                        })
+                        .fail(function(err) {
+                            console.log(err);
+                        });
+
+                        return false;
+                        event.preventDefault();
+                    });
+
+                });
+            });
+
+        });
+
+        $(nmTbl).on('click', '#view', function () {
+            var id =$(this).attr('data-key');
+
+            demo.ajaxGet(api_url+place+'/get/'+id).success(function(respon){
+                var dataID = respon[2].data;
+                var header = respon[1].header;
+                var id     = dataID[0][0]; console.log(id);
+                var detail = [];
+
+                var viewCont = '';
+
+                $.each(header, function(index, val) {
+                    viewCont += '<fieldset>'+
+                                '<div class="form-group">'+
+                                    '<label class="col-sm-3 control-label">'+val+'</label>'+
+                                    '<div class="col-sm-8">'+
+                                        '<span class="help-block">'+dataID[0][index]+'</span>'+
+                                    '</div>'+
+                                '</div>'+
+                                 '</fieldset>'
+                });
+
+                viewCont +='<table class="table table-striped">'+
+                                '<thead>'+
+                                    '<tr>'+
+                                        '<td>No</td>'+
+                                        '<td>Nama</td>'+
+                                        '<td>Qty</td>'+
+                                        '<td>UOM</td>'+
+                                        '<td>Harga</td>'+
+                                        '<td>Disc</td>'+
+                                        '<td>Total</td>'+
+                                    '</tr>'+
+                                '</thead>'+
+                                '<tbody>';
+
+                demo.ajaxGet(api_url+'purchase_order_detail/getPO/'+id).success(function(respons){
+                    
+                    $.each(respons[1].data, function(index, val) {
+                        viewCont += '<tr>'+
+                                        '<td>'+(index+1)+'</td>'+
+                                        '<td>'+val.Nama+'</td>'+
+                                        '<td>'+val.Qty+'</td>'+
+                                        '<td>'+val.UOM+'</td>'+
+                                        '<td>'+val.Harga+'</td>'+
+                                        '<td>'+val.Disc+'</td>'+
+                                        '<td>'+val.Total+'</td>'+
+                                    '</tr>';                        
+                    });
+
+                     viewCont +='<tbody>'+
+                            '</table>';
+                                    
+
+                    demo.createModal({nameEl : '#modals',
+                                    id : 'viewForm',
+                                    title : 'View Data '+place+' ID: '+id,
+                                    content : viewCont,
+                                    form : place,
+                                    btn_save :'' 
+                                });
+                    $('#viewForm').modal('show');
+
+                });
+            });
+            
+        });
+
+        $(nmTbl).on('click', '#delete', function () {
+            var id =$(this).attr('data-key');
+            demo.createModal({nameEl : '#modals',
+                            id : 'deleteAct',
+                            title : 'Delete Data '+place+' ID: '+id,
+                            content : '<span>Data ID '+id+' akan di hapus? </span>',
+                            form : place,
+                            btn_save :'<button type="submit" class="btn btn-primary" id="dltBtn">Yes</button>'
+                        });
+
+             $('#deleteAct').modal('show');
+
+            $("#"+place).submit(function( event ) {
+                var NamaKategori = $('#NamaKategori').val();
+                
+                demo.putAjax(api_url+place+'/delete/'+id,{},"GET"); // update
+            
+                event.preventDefault();
+            });
+        });
+
+     });
+
+    function saveItem() {
+        var dataDetail = [];
+
+        $('#saveItem').click(function(event) {
+                var cn = $("div[id^='countQty']");
+                var input = $(".Qty");
+
+                var total = 0;
+                var detail = [];
+
+                $.each(cn, function(index, val) { 
+                    total +=  parseInt($(val).html()); 
+                });
+
+                $.each(input, function(index, val) { 
+                    var el = $(val);
+                    var id = el.attr('data-id');
+
+                    if(el.val() !== ""){
+                        dataDetail.push({"ID_Barang":id,
+                            "ID_PO": $("#ID").val(), 
+                            "Qty" : ($("#Qty_"+id).val() === "")? 0 :$("#Qty_"+id).val(),
+                            "UOM" : ( $("#UOM_"+id).val() === "")? 0 :$("#UOM_"+id).val(), 
+                            "Disc":  ($("#Disc_"+id).val() === "")? 0 :$("#Disc_"+id).val(),
+                            "Total" : ($("#countQty_"+id).html() === "")? 0 :$("#countQty_"+id).html() 
+                        } );
+                    }
+                });
+
+                $('#itemModal').modal('hide');
+            });
+        
+        return dataDetail;
+    }
+
+    function loadDataItem(place) {
+        $.getJSON(api_url+"barang/getInput", function(result){
+            var tblItems = '<table id="tbl_items" class="display" cellspacing="0" width="100%"></table>';
+            demo.createModal({nameEl : '#modalItems',id:"itemModal", content : tblItems,form:'brgItems',title:'Add Data Barang'+place,btn_save: '<button type="button" class="btn btn-primary" id="saveItem">Save changes</button>'});
+
+            var head = demo.genHeaderCustom(result[1].header,[{"title":"Qty"},{"title":"UOM"}, {"title": "Disc"}, {"title":"Total"}]);
+            var data = result[2].data;
+
+            demo.initDatatable("#tbl_items",{
+                data: result[2].data,
+                columns: head,
+                columnDefs: [ {
+                    "targets": -1,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {return '<div id="countQty_'+row[0]+'" style="display: inline-flex;padding-left: 13px;">0</div>'}
+                    
+                },
+                {
+                    "targets": -2,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {
+                                return '<input type="number" class="form-control Disc" data-id="'+row[0]+'" data-price="'+row[2]+'" id="Disc_'+row[0]+'" style="width: 70px;">'
+                            }
+                    
+                },
+                {
+                    "targets": -3,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {
+                                return '<input type="number" class="form-control UOM" data-id="'+row[0]+'" data-price="'+row[2]+'" id="UOM_'+row[0]+'" style="width: 70px;">'
+                            }
+                    
+                },
+                {
+                    "targets": -4,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {
+                                return '<input type="number" class="form-control Qty" data-id="'+row[0]+'" data-price="'+row[2]+'" id="Qty_'+row[0]+'" style="width: 70px;">'
+                            }
+                    
+                }],
+            });
+        }); 
+    }
+  </script>

@@ -1,0 +1,295 @@
+
+<div class="col-md-12">
+    <h4 class="title">Bukti Pemakaian Bahan</h4>
+       
+    <div class="card">
+        <div class="card-header">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="card-title">Data Bukti Pemakaian Bahan</h4>    
+                </div>
+                
+                <div class="col-md-4">
+                    <button class="btn btn-fill" data-toggle="modal" id="addForm" id="add">Create</button>
+                </div>     
+            </div>
+            
+        </div>
+        <div class="card-content">
+
+            <div class="fresh-datatables">
+                <table id="datatables" class="table table-striped table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
+                </table>
+            </div>
+
+
+        </div>
+    </div><!--  end card  -->
+</div>
+<!-- Button trigger modal -->
+<div id="modals"></div>
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        
+        var nmTbl = '#datatables';
+        var place = 'pemakaian_barang';
+        var count = 0;
+
+
+        loadDataParent(nmTbl,place ) ; // init datatable in front page  
+
+        var form = '<div class="card-content">'+
+                        '<div class="form-group">'+
+                            '<label>No</label>'+
+                            '<input type="text" placeholder="Nama Barang" id="ID" class="form-control" disabled>'+
+                        '</div>'+
+                        '<div class="form-group">'+
+                            '<label>Gudang</label>'+
+                            '<select id="ID_Gudang" class="form-control"></select>'+
+                        '</div>'+
+                    '</div>';
+
+        loadTableItem(form,place);
+ 
+        $("#addForm").click(function(event) {
+            $('#ID').val(demo.genID('DG0000000000', count));
+            $('#itemModal').modal('show');
+
+            $( "#"+place ).submit(function( event ) {
+                var param = genParam();
+
+                $.post(api_url+place+'/add/', param.param, function(data, textStatus, xhr) {
+                    if(textStatus === "success"){
+                        
+                        $.each(param.paramDetail, function(index, val) {
+                            demo.putAjax(api_url+place+'_detail/add',val,"");// insert detail
+                        });
+
+                        loadDataParent(nmTbl,place,true );
+
+                        demo.showNotification('<span><b> Success - </b> Data <b>'+$("#ID").val()+'</b> Successfully inserted </span>','success');
+                        $('#itemModal').modal('hide');
+
+                    }else{
+                        demo.showNotification('<span><b> Error - </b> '+textStatus+'','danger');
+                    }
+                   
+                });
+
+                return false;
+                event.preventDefault();
+            });
+        });
+
+        $(nmTbl).on('click', '#edit', function () {
+
+            var id =$(this).attr('data-key');
+            var checkData = [];
+
+            loadTableItem(form,place); // reset table item 
+
+            demo.ajaxGet(api_url+place+'/get/'+id).success(function(respon){
+                demo.ajaxGet(api_url+place+'_detail/get/'+id).success(function(respons){
+                    
+                    var header = respon[1].header;
+                    var dataID = respon[2].data[0];
+
+                    if(respons[1].header !== undefined){
+                        var dataItem = respons[2].data; 
+                    
+                        $.each(dataItem, function(index, val) {
+                             $('#Qty_'+val[0]).val(val[3]);
+                             $('#NamaPengguna_'+val[0]).val(val[4]);
+                             $('#Keterangan_'+val[0]).val(val[5]);
+
+                             checkData.push(val[0]);
+                        });
+                    }
+
+                    $('#ID').val(dataID[0]);
+                    $('#ID_Gudang').val(dataID[1]);
+
+                    $('#itemModal').modal('show');
+                     
+                });
+ 
+                $("#"+place).submit(function( event ) {
+                    var param = genParam();
+                    var id    = $("#ID").val();
+
+                    $.post(api_url+place+'/update/'+id, param.param, function(data, textStatus, xhr) {
+                        if(textStatus === "success"){
+                            
+                            $.each(param.paramDetail, function(index, val) {
+                                var url = ($.inArray(val.ID_Barang,checkData) === -1) ? api_url+place+'_detail/add/' : api_url+place+'_detail/update/'+id;
+                                demo.putAjax(url,val,"");
+                            });       
+
+                            loadDataParent(nmTbl,place,true );
+                            demo.showNotification('<span><b> Success - </b> Data <b>'+$("#ID").val()+'</b> Successfully Updated </span>','success');
+                            $('#itemModal').modal('hide');
+                        }else{
+                            demo.showNotification('<span><b> Error - </b> '+textStatus+'','danger');
+                        }
+                       
+                    });
+
+                    return false;
+                    event.preventDefault();
+                });
+
+                
+            });
+        });
+
+        
+        $(nmTbl).on('click', '#view', function () {
+            var id =$(this).attr('data-key');
+
+            demo.ajaxGet(api_url+place+'/getView/'+id).success(function(respon){
+                
+                var id     = respon[2].data[0][0]; 
+                var viewCont = '';
+
+                demo.ajaxGet(api_url+place+'_detail/getView/'+id).success(function(respons){
+
+                    viewCont += demo.CreateTableView(respons,respon);
+
+                    demo.createModal({nameEl : '#modals',
+                                    id : 'viewForm',
+                                    title : 'View Data '+place+' ID: '+id,
+                                    content : viewCont,
+                                    form : place,
+                                    btn_save :'' 
+                                });
+                    $('#viewForm').modal('show');
+
+                });
+            });
+            
+        });
+
+
+        $(nmTbl).on('click', '#delete', function () {
+            var id =$(this).attr('data-key');
+            demo.createModal({nameEl : '#modals',
+                            id : 'deleteAct',
+                            title : 'Delete Data '+place+' ID: '+id,
+                            content : '<span>Data ID '+id+' akan di hapus? </span>',
+                            form : place,
+                            btn_save :'<button type="submit" class="btn btn-primary" id="dltBtn">Yes</button>'
+                        });
+
+             $('#deleteAct').modal('show');
+
+            $("#"+place).submit(function( event ) {
+                var NamaKategori = $('#NamaKategori').val();
+                
+                demo.putAjax(api_url+place+'/delete/'+id,{},"GET"); // update
+            
+                event.preventDefault();
+            });
+        });
+
+     });
+    
+    function genParam() {
+        var inp =  $(".Qty");
+        var param = {},paramDetail = [];
+        
+        param['ID'] = $('#ID').val();
+        param['ID_Gudang'] = $('#ID_Gudang').val();
+
+        $.each(inp, function(index, val) { 
+            var el = $(val);
+
+            if(el.val() !== ""){
+                paramDetail.push({"ID_BPMB":$('#ID').val(),"ID_Barang": el.attr('data-id'), "Qty" : el.val(), "NamaPengguna" : $("#NamaPengguna_"+el.attr('data-id')).val(),"Keterangan" : $("#Keterangan_"+el.attr('data-id')).val() } );
+            }
+        });
+
+        return {"param": param, "paramDetail":paramDetail};
+    }
+
+    function loadDataParent(nmTbl,place,destroy = false ) {
+
+        $.getJSON(api_url+place+"/get", function(result){
+
+            if(result[1].header !== undefined){
+                var head = demo.genHeader(result[1].header);
+                var data = result[2].data;
+
+                count = data.length;
+
+                demo.initDatatable(nmTbl,{
+                    data: data,
+                    columns: head,
+                    destroy : destroy,
+                    columnDefs: [ {
+                        "targets": -1,
+                        "data": data,
+                        "render": function ( data, type, row, meta ) {
+                                  return '<button class="btn btn-default"  data-key="'+row[0]+'" id="view">View</button>'+
+                                           '<button class="btn btn-default"  data-key="'+row[0]+'" id="edit">Edit</button>'+
+                                           '<button class="btn btn-default"  data-key="'+row[0]+'" id="delete">Delete</button>'
+                                }
+                        
+                    }],
+                });
+            }
+        });
+    }
+    function loadTableItem(form,place) {
+        $.getJSON(api_url+"barang/get", function(result){
+            var tblItems = form+'<table id="tbl_items" class="display" cellspacing="0" width="100%"></table>';
+            demo.createModal({nameEl : '#modals',id:"itemModal", content : tblItems,form:place,title:'Add Data Barang'+place});
+
+            var head = demo.genHeaderCustom([],[{"title":"Nama"},{"title":"Satuan"},{"title":"Qty"},{"title":"Nama Pengguna"}, {"title": "Keterangan"}]);
+            var data = result[2].data;
+
+            demo.initDatatable("#tbl_items",{
+                data: result[2].data,
+                columns: head,
+                columnDefs: [ {
+                    "targets": -5,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) { return row[1]}
+                },{
+                    "targets": -4,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) { return row[5]}
+                },{
+                    "targets": -3,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {
+                                return '<input type="number" class="form-control Qty" data-id="'+row[0]+'" data-price="'+row[2]+'" id="Qty_'+row[0]+'" style="width: 70px;">'
+                            }                    
+                },{
+                    "targets": -2,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {return '<input type="text" class="form-control NamaPengguna" data-id="'+row[0]+'" data-price="'+row[2]+'" id="NamaPengguna_'+row[0]+'"  >'}
+                },
+                {
+                    "targets": -1,
+                    "data": data,
+                    "render": function ( data, type, row, meta ) {
+                                return '<input type="text" class="form-control Keterangan" data-id="'+row[0]+'" data-price="'+row[2]+'" id="Keterangan_'+row[0]+'" >'
+                            }
+                }
+                ],
+            });
+        }); 
+
+        $.getJSON(api_url+"gudang/get", function(result){
+            var dataKat = result[2].data;
+
+            var cont = '<option value="">Pilih Gudang</option>';
+            $.each(dataKat, function(index, val) {
+                 cont +=('<option value="'+val[0]+'">'+val[1]+'</option>');
+            });
+
+            $("#ID_Gudang").append(cont);
+        });
+    }
+  </script>

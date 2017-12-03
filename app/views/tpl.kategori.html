@@ -1,0 +1,142 @@
+
+<div class="col-md-12">
+    <h4 class="title">Kategori</h4>
+       
+    <div class="card">
+        <div class="card-header">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="card-title">Data Kategori</h4>    
+                </div>
+                
+                <div class="col-md-4">
+                    <button class="btn btn-fill" data-toggle="modal" data-target="#addForm" id="add">Create</button>
+                </div>     
+            </div>
+            
+        </div>
+        <div class="card-content">
+
+            <div class="fresh-datatables">
+                <table id="datatables" class="table table-striped table-no-bordered table-hover" cellspacing="0" width="100%" style="width:100%">
+                </table>
+            </div>
+
+
+        </div>
+    </div><!--  end card  -->
+</div>
+<!-- Button trigger modal -->
+<div id="modals"></div>
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        
+        var nmTbl = '#datatables';
+        var place = 'kategori';
+
+        $.getJSON(api_url+place+"/get", function(result){
+            var head = demo.genHeader(result[1].header);
+            demo.createDatatable(nmTbl,result[2].data, head); // init datatable
+        }); 
+
+        var form = '<div class="card-content">'+
+                        '<div class="form-group">'+
+                            '<label>Nama Kategori</label>'+
+                            '<input type="text" placeholder="Nama Kategori" id="NamaKategori" class="form-control">'+
+                        '</div>'+
+                    '</div>';
+                   
+
+         $("#add").click(function(event) {
+            demo.createModal({nameEl : '#modals' , content : form});
+
+            $( "#"+place ).submit(function( event ) {
+                var NamaKategori = $('#NamaKategori').val();
+              
+                demo.putAjax(api_url+place+'/add',{NamaKategori: NamaKategori}); // insert
+            
+                event.preventDefault();
+            });
+        });
+
+        $(nmTbl).on('click', '#edit', function () {
+            var id =$(this).attr('data-key');
+
+            demo.ajaxGet(api_url+place+'/get/'+id).success(function(respon){
+                var dataID = respon[2].data;
+
+                demo.createModal({nameEl : '#modals',id : 'editForm',title : 'Edit Data '+place+' ID: '+id,content : form,form : place});
+
+                $('#NamaKategori').val(dataID[0][1]);
+                $('#editForm').modal('show');
+
+                $("#"+place).submit(function( event ) {
+                    var NamaKategori = $('#NamaKategori').val();
+                    
+                    demo.putAjax(api_url+place+'/update/'+id,{NamaKategori: NamaKategori}); // update
+                
+                    event.preventDefault();
+                });
+
+                
+            });
+
+        });
+
+        $(nmTbl).on('click', '#view', function () {
+            var id =$(this).attr('data-key');
+
+            demo.ajaxGet(api_url+place+'/get/'+id).success(function(respon){
+                var dataID = respon[2].data;
+                var header = respon[1].header;
+                var viewCont = '';
+
+                $.each(header, function(index, val) {
+                    viewCont += '<fieldset>'+
+                                '<div class="form-group">'+
+                                    '<label class="col-sm-3 control-label">'+val+'</label>'+
+                                    '<div class="col-sm-8">'+
+                                        '<span class="help-block">'+dataID[0][index]+'</span>'+
+                                    '</div>'+
+                                '</div>'+
+                                 '</fieldset>'
+                });
+                                    
+
+                demo.createModal({nameEl : '#modals',
+                                id : 'viewForm',
+                                title : 'View Data '+place+' ID: '+id,
+                                content : viewCont,
+                                form : place,
+                                btn_save :'' 
+                            });
+                $('#viewForm').modal('show');
+                
+            });
+            
+        });
+
+        $(nmTbl).on('click', '#delete', function () {
+            var id =$(this).attr('data-key');
+            demo.createModal({nameEl : '#modals',
+                            id : 'deleteAct',
+                            title : 'Delete Data '+place+' ID: '+id,
+                            content : '<span>Data ID '+id+' akan di hapus? </span>',
+                            form : place,
+                            btn_save :'<button type="submit" class="btn btn-primary" id="dltBtn">Yes</button>'
+                        });
+
+             $('#deleteAct').modal('show');
+
+            $("#"+place).submit(function( event ) {
+                var NamaKategori = $('#NamaKategori').val();
+                
+                demo.putAjax(api_url+place+'/delete/'+id,{},"GET"); // update
+            
+                event.preventDefault();
+            });
+        });
+
+     });
+  </script>
